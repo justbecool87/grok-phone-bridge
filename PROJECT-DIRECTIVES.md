@@ -129,3 +129,10 @@ fleet-captain-discretion approve <id>
 fleet-captain-discretion override <id>
 fleet-captain-discretion hold
 ```
+
+## 11. Persistent keep-alive + Termux HUD overlay
+
+- **`fleet-keepalive`** keeps all daemons and actors working alongside existing commands/deployments (respects Captain-approved REST).
+- **`fleet-hud`** Termux/ADB permission overlay: **yellow=working**, **green=ready**, **red=idle/overburdened**, with counts.
+  - Terminal: `tmux attach -t fleet-hud` or `fleet-hud show`
+  - MiXplorer: `/sdcard/Download/grok-inbox/fleet-monitor/FLEET-HUD.txt`
