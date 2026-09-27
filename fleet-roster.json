@@ -1,0 +1,18 @@
+{
+  "directors": [
+    {"id": "fleet-captain", "name": "Fleet Captain", "title": "Harbor Master of the Swarm"},
+    {"id": "termux-commander", "name": "Termux Commander", "title": "The Terminal Director"},
+    {"id": "regulator", "name": "Regulator Bot", "title": "Regulator"}
+  ],
+  "lackeys": [
+    {"id": "scout", "name": "Scout", "specialty": "media discovery"},
+    {"id": "probe", "name": "Probe", "specialty": "video forensics"},
+    {"id": "svd-smith", "name": "SVD Smith", "specialty": "Stable Video Diffusion"},
+    {"id": "harbor", "name": "Harbor", "specialty": "delivery & inject"},
+    {"id": "courier", "name": "Courier", "specialty": "fetch weights/assets"},
+    {"id": "quay", "name": "Quay", "specialty": "deploy runtime/exports"},
+    {"id": "archivist", "name": "Archivist", "specialty": "research SVD protocols"},
+    {"id": "loom", "name": "Loom", "specialty": "render/mux enhanced video"}
+  ],
+  "directive": "FC-001"
+}

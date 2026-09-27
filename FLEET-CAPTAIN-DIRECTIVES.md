@@ -60,6 +60,26 @@ grok-phone stage '/sdcard/Movies/Messages/VID_20260927_105213.mp4'
 adb-to-grok say 'FC-001 Harbor: SVD export ready in ~/grok-inbox/'
 ```
 
+
+
+### Expanded Lackeys (FC-001 workload — fetch / deploy / research / render)
+
+| # | Lackey callsign | Specialty | Duty |
+|---|-----------------|-----------|------|
+| 5 | **Courier** | Fetch | Pull SVD weights, HF assets, deps when ordered; never overwrite source media |
+| 6 | **Quay** | Deploy | Keep Kali SVD venv healthy; publish exports into `~/grok-inbox/` + sdcard mirror |
+| 7 | **Archivist** | Research | SVD protocol notes, preset research, cite PROTOCOL.md before runs |
+| 8 | **Loom** | Render | Post-SVD encode/mux/audio attach → `*-svd-enhanced.mp4` |
+
+**Comms:** all Lackeys ping Fleet Captain via `fleet-bus`; Regulator Bot monitors `~/grok-inbox/fleet/regulator/`.
+
+```bash
+fleet-comms-demo          # prove ping/assign/ACK
+fleet-regulator-monitor 6 2
+fleet-bus board
+fleet-bus clips 20
+```
+
 ### Acceptance
 
 - [x] Target video identified and staged  
