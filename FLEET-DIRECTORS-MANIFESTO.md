@@ -53,3 +53,9 @@ Requirements: Termux, bridge installed, **live** Grok Build session (`grok-*-lin
 ## Standing order for this manifesto
 
 Clone or pull this repo on the phone, keep this file as the fleet contract, and inject into Grok Build only when the user asks for elevated execute. Never claim ADB success without command output.
+
+## Active directives
+
+Handed down Terminal Commander → Fleet Captain:
+
+- See **`FLEET-CAPTAIN-DIRECTIVES.md`** (FC-001: locate Messages video + Stable Video Diffusion enhance with 4 Lackeys: Scout, Probe, SVD Smith, Harbor).
