@@ -136,3 +136,12 @@ fleet-captain-discretion hold
 - **`fleet-hud`** Termux/ADB permission overlay: **yellow=working**, **green=ready**, **red=idle/overburdened**, with counts.
   - Terminal: `tmux attach -t fleet-hud` or `fleet-hud show`
   - MiXplorer: `/sdcard/Download/grok-inbox/fleet-monitor/FLEET-HUD.txt`
+
+## 12. Regulator integrity / error / conflict audit
+
+Fleet directive: **Regulator** queries every actor for **errors**, **missing/corrupt/truncated** files, and **conflicts**, then summarizes for **Archivist** resolutions.
+
+```bash
+fleet-regulator-audit run
+# MiXplorer: REGULATOR-AUDIT.md + ARCHIVIST-RESOLUTIONS.md
+```
