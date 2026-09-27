@@ -54,3 +54,24 @@ Lower priorities are **held** while higher priority is RUNNING/NEEDED.
 ---
 
 *Updated from owner conversation directives; Fleet Captain must treat this file as standing project orders.*
+
+
+## 7. REST and REASSIGNMENT (Monitor + Regulator → Fleet Captain)
+
+Static parameters allow **any Lackey/Actor** to receive **REST** or **REASSIGNMENT** when **Monitor** and **Regulator** deem it beneficial.
+
+Flow:
+1. Monitor + Regulator **propose** (`fleet-rest-reassign propose`)
+2. Report goes to **monitor bot** channel (bus + `REST-REASSIGN-PENDING.*` in MiXplorer) for **Fleet Captain**
+3. Fleet Captain may **approve** / **disapprove**, **or** assign research Lackey (`archivist-aux` by default) to brief **why approve/disapprove**
+4. On **APPROVE**, Fleet Captain **issues the agentic effort** (rest window or reassignment to Forge/specialty lead)
+
+```bash
+fleet-rest-reassign propose
+fleet-rest-reassign research          # research brief
+fleet-rest-reassign approve all       # Captain approves → execute
+fleet-rest-reassign disapprove all
+fleet-rest-reassign status
+```
+
+Tunables: `FLEET_REST_WINDOW_SEC`, `FLEET_OVERBURDEN_MSGS`, `FLEET_IDLE_MSGS_MAX`, `FLEET_REST_MIN_SEC`, `FLEET_RESEARCH_ACTOR`

@@ -278,6 +278,11 @@ PY
 cmd_once() {
   analyze
   notify_captain
+
+  # Monitor+Regulator REST/REASSIGN recommendations for Fleet Captain
+  if command -v fleet-rest-reassign >/dev/null; then
+    fleet-rest-reassign propose >>"$OUTDIR/rest-propose.log" 2>&1 || true
+  fi
   echo "report=$TEXT"
   cat "$TEXT"
 }
