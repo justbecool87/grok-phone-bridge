@@ -145,3 +145,49 @@ Fleet directive: **Regulator** queries every actor for **errors**, **missing/cor
 fleet-regulator-audit run
 # MiXplorer: REGULATOR-AUDIT.md + ARCHIVIST-RESOLUTIONS.md
 ```
+
+
+## 13. FC-002 — Morpheous Depth MCP + Deep-Research Skeleton Upgrade
+
+**Project home:** `justbecool87/morpheous-depth` + live `https://morpheous-depth.vercel.app/`  
+**Buff MCP (Vercel-first):** `https://morpheous-depth.vercel.app/api/mcp`  
+**Axes:** depth / breadth / height / weight
+
+### Forge standing order (triad)
+
+**Forge** collaborates continuously with **Archivist** (protocol/index/research briefs) and **Courier** (deps, HF/npm/gh assets, cache) to thicken every thin actor skeleton for deep research — speed and scalability first.
+
+Priority thin targets: `termux-commander`, `forge`, `archivist`, `courier`, `harbor`, `quay`, `loom`, then `scout`/`probe`. Keep `svd-smith` quality path intact.
+
+Per-actor deliverable: real `lib/` modules + ≥1 `bin/` CLI + `DEEP-RESEARCH.md` contract.
+
+### New actors (Termux Commander deploys)
+
+| Actor | Role |
+|-------|------|
+| **morpheous-depth** | Fleet MCP client/bridge to Vercel buff MCP |
+| **api-swarm-alpha** | Swarm injector — breadth/reach fan-out data pulls into MCP |
+| **api-swarm-bravo** | Swarm injector — depth/weight payload aggregation from MCP |
+
+Alpha + Bravo expand MCP reach: parallel API pulls, inject results back through Morpheous tools, feed Archivist briefs.
+
+### Commands
+
+```bash
+fleet-morpheous status
+fleet-morpheous mcp-ping
+fleet-termux-commander deploy-morpheous
+```
+
+### FC-001 coexistence
+
+Anonymous SVD weight fetch continues under Courier/Quay/SVD Smith. **P0 weights do not block FC-002.**
+
+### Regulator — swarm injector overburden loop
+
+If `api-swarm-alpha` / `api-swarm-bravo` are overburdened:
+
+1. Regulator analyzes load and writes `REGULATOR-SUPERIORS/SWARM-INJECTOR-LOAD.md`
+2. Regulator reports to Fleet Captain with `directive_request=true`
+3. Captain issues `DEPLOY_SWARM_INJECTOR_ASSIST` → Termux Commander deploys aux injectors / reassigns available actors
+4. Preserve Morpheous buff MCP + Grok MCP deep-research paths

@@ -137,8 +137,25 @@ publish() {
       fleet-regulator-reassign scan >/dev/null 2>&1 || true
     fi
 
+    # Live HUD counts — refresh with every mirror publish
+    if command -v fleet-hud >/dev/null 2>&1; then
+      fleet-hud render >/dev/null 2>&1 || true
+    fi
+    HUD_LINE="🟡? 🟢? 🔴?"
+    if [[ -f "$HOME/grok-inbox/fleet/hud/HUD.json" ]]; then
+      HUD_LINE=$(python3 - <<'PYC'
+import json
+from pathlib import Path
+c=json.loads(Path.home().joinpath("grok-inbox/fleet/hud/HUD.json").read_text())["counts"]
+print(f"🟡{c['working']} working · 🟢{c['ready']} ready · 🔴{c['idle']} idle · Σ{c['total']}")
+PYC
+)
+    fi
     {
       echo "╔══ FLEET PROJECT MONITOR  $(ts)  ACTIVE DUTIES ══╗"
+      echo "HUD  $HUD_LINE"
+      echo "     (auto-adjusts each mirror refresh as actors change workflow)"
+      echo
       fleet-bus board 2>/dev/null || true
       echo
       echo "workload: src=$src_ok frames=$frames_ok torch=$torch_ok diffusers=$diff_ok pip_busy=$pip_busy"
@@ -173,12 +190,40 @@ PYF
   cp -f "$SRC_FEED" "$MIRROR/FEED.txt"
   chmod 664 "$MIRROR/LIVE.txt" "$MIRROR/FEED.txt" 2>/dev/null || true
 
-  python3 - "$SRC_LIVE" "$SRC_FEED" "$HTML" <<'PYH'
-import html, pathlib, sys, time, os
-live, feed, out = map(pathlib.Path, sys.argv[1:4])
+  # Ensure HUD files exist for this refresh
+  if command -v fleet-hud >/dev/null 2>&1; then
+    fleet-hud render >/dev/null 2>&1 || true
+  fi
+  HUD_JSON="$HOME/grok-inbox/fleet/hud/HUD.json"
+  HUD_TXT="$HOME/grok-inbox/fleet/hud/HUD.txt"
+  python3 - "$SRC_LIVE" "$SRC_FEED" "$HTML" "$HUD_JSON" "$HUD_TXT" "$MIRROR" <<'PYH'
+import html, json, pathlib, sys, time, os, shutil
+live, feed, out, hud_json, hud_txt, mirror = map(pathlib.Path, sys.argv[1:7])
 live_txt = live.read_text(errors="replace") if live.exists() else ""
 feed_txt = feed.read_text(errors="replace") if feed.exists() else ""
 feed_tail = "\n".join(feed_txt.splitlines()[-120:])
+hud_body = hud_txt.read_text(errors="replace") if hud_txt.exists() else ""
+counts = {"working": 0, "ready": 0, "idle": 0, "total": 0}
+actors = []
+if hud_json.exists():
+    try:
+        doc_h = json.loads(hud_json.read_text())
+        counts = doc_h.get("counts", counts)
+        actors = doc_h.get("actors", [])
+    except Exception:
+        pass
+w, r, i, tot = counts.get("working",0), counts.get("ready",0), counts.get("idle",0), counts.get("total",0)
+rows = []
+for a in actors:
+    b = a.get("bucket", "idle")
+    color = {"working": "#facc15", "ready": "#22c55e", "idle": "#ef4444", "overburdened": "#ef4444"}.get(b, "#94a3b8")
+    rows.append(
+        f"<div class='actor'><span class='dot' style='background:{color}'></span>"
+        f"<span class='name'>{html.escape(str(a.get('id','')))}</span>"
+        f"<span class='tr'>{html.escape(str(a.get('transit','')))}</span>"
+        f"<span class='det'>{html.escape(str(a.get('detail',''))[:48])}</span></div>"
+    )
+actors_html = "\n".join(rows) or "<div class='meta'>no actor states yet</div>"
 ts = time.strftime("%Y-%m-%dT%H:%M:%S%z")
 uid = os.getuid()
 doc = f"""<!DOCTYPE html>
@@ -186,18 +231,40 @@ doc = f"""<!DOCTYPE html>
 <meta charset=\"utf-8\"/>
 <meta http-equiv=\"refresh\" content=\"4\"/>
 <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/>
-<title>Fleet LIVE · ACTIVE</title>
+<title>Fleet LIVE · HUD</title>
 <style>
 body{{font-family:ui-monospace,monospace;background:#0b0f14;color:#e5eef7;margin:0;padding:12px}}
 h1{{font-size:18px;color:#7dd3fc;margin:0 0 6px}}
 .meta{{color:#94a3b8;font-size:12px;margin-bottom:12px}}
 h2{{font-size:14px;color:#a5b4fc;margin:16px 0 6px}}
+.hud{{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 14px}}
+.pill{{border-radius:999px;padding:10px 14px;font-weight:700;font-size:16px;border:1px solid #1f2937}}
+.pill .n{{font-size:22px;margin-right:6px}}
+.y{{background:#422006;color:#facc15}}
+.g{{background:#052e16;color:#22c55e}}
+.r{{background:#450a0a;color:#f87171}}
+.s{{background:#111827;color:#e5eef7}}
+.actor{{display:grid;grid-template-columns:18px 140px 140px 1fr;gap:8px;align-items:center;
+padding:4px 0;border-bottom:1px solid #1f2937;font-size:12px}}
+.dot{{width:10px;height:10px;border-radius:50%;display:inline-block}}
+.name{{color:#e5eef7}} .tr{{color:#93c5fd}} .det{{color:#94a3b8}}
 pre{{white-space:pre-wrap;word-break:break-word;background:#111827;border:1px solid #1f2937;
 padding:10px;border-radius:10px;line-height:1.35;font-size:12px}}
 </style>
 </head><body>
-<h1>Fleet Project Monitor · ACTIVE DUTIES</h1>
-<p class=\"meta\">MiXplorer mirror · auto-refresh 4s · {html.escape(ts)} · uid={uid} · idle forbidden on FC-001</p>
+<h1>Fleet Project Monitor · LIVE HUD</h1>
+<p class=\"meta\">MiXplorer mirror · auto-refresh 4s · {html.escape(ts)} · uid={uid} · dots auto-adjust with actor workflow</p>
+<div class=\"hud\">
+  <div class=\"pill y\"><span class=\"n\">{w}</span>🟡 working</div>
+  <div class=\"pill g\"><span class=\"n\">{r}</span>🟢 ready</div>
+  <div class=\"pill r\"><span class=\"n\">{i}</span>🔴 idle/over</div>
+  <div class=\"pill s\"><span class=\"n\">{tot}</span>Σ actors</div>
+</div>
+<p class=\"meta\">Current snapshot: 🟡{w} working · 🟢{r} ready · 🔴{i} idle</p>
+<h2>Actors (live)</h2>
+{actors_html}
+<h2>HUD dump</h2>
+<pre>{html.escape(hud_body)}</pre>
 <h2>LIVE board</h2>
 <pre>{html.escape(live_txt)}</pre>
 <h2>FEED (tail)</h2>
@@ -205,6 +272,20 @@ padding:10px;border-radius:10px;line-height:1.35;font-size:12px}}
 </body></html>
 """
 out.write_text(doc)
+# keep HUD artifacts in mirror in sync every refresh
+try:
+    if hud_txt.exists():
+        shutil.copy2(hud_txt, mirror / "FLEET-HUD.txt")
+    if hud_json.exists():
+        shutil.copy2(hud_json, mirror / "FLEET-HUD.json")
+    ansi = pathlib.Path.home()/"grok-inbox/fleet/hud/HUD.ansi"
+    if ansi.exists():
+        shutil.copy2(ansi, mirror / "FLEET-HUD.ansi")
+    (mirror / "FLEET-HUD.PERMISSION").write_text(
+        "fleet-hud permission=granted source=live-mirror-refresh adb=allowed\n"
+    )
+except Exception:
+    pass
 PYH
   chmod 664 "$HTML" 2>/dev/null || true
 }

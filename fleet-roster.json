@@ -124,7 +124,67 @@
       "reason": "high_traffic",
       "deployed_by": "termux-commander",
       "privilege": "elevated"
+    },
+    {
+      "id": "morpheous-depth",
+      "name": "Morpheous Depth",
+      "specialty": "Vercel MCP bridge / deep research client",
+      "project": "morpheous-depth",
+      "deployed_by": "termux-commander",
+      "privilege": "elevated"
+    },
+    {
+      "id": "api-swarm-alpha",
+      "name": "API Swarm Alpha",
+      "specialty": "swarm injector \u2014 breadth/reach fan-out into buff MCP",
+      "project": "morpheous-depth",
+      "works_with": [
+        "morpheous-depth",
+        "api-swarm-bravo",
+        "courier",
+        "archivist"
+      ],
+      "deployed_by": "termux-commander",
+      "privilege": "elevated"
+    },
+    {
+      "id": "api-swarm-bravo",
+      "name": "API Swarm Bravo",
+      "specialty": "swarm injector \u2014 depth/weight payload pulls from buff MCP",
+      "project": "morpheous-depth",
+      "works_with": [
+        "morpheous-depth",
+        "api-swarm-alpha",
+        "courier",
+        "archivist"
+      ],
+      "deployed_by": "termux-commander",
+      "privilege": "elevated"
+    },
+    {
+      "id": "api-swarm-alpha-aux",
+      "name": "api-swarm-alpha-aux",
+      "specialty": "twin of api-swarm-alpha",
+      "relieves": "api-swarm-alpha",
+      "reason": "swarm_injector_overburden",
+      "deployed_by": "termux-commander",
+      "privilege": "elevated",
+      "project": "morpheous-depth"
+    },
+    {
+      "id": "api-swarm-bravo-aux",
+      "name": "api-swarm-bravo-aux",
+      "specialty": "twin of api-swarm-bravo",
+      "relieves": "api-swarm-bravo",
+      "reason": "swarm_injector_overburden",
+      "deployed_by": "termux-commander",
+      "privilege": "elevated",
+      "project": "morpheous-depth"
     }
   ],
-  "directive": "FC-001"
+  "directive": "FC-002",
+  "directives_active": [
+    "FC-001",
+    "FC-002"
+  ]
 }

@@ -1,0 +1,71 @@
+#!/data/data/com.termux/files/usr/bin/bash
+set -euo pipefail
+export PATH="$HOME/bin:/data/data/com.termux/files/usr/bin:$PATH"
+MIX="/sdcard/Download/grok-inbox/fleet-monitor/morpheous"
+cmd="${1:-status}"
+case "$cmd" in
+  status)
+    echo "FC-002 Morpheous Depth"
+    echo "UI: https://morpheous-depth.vercel.app/"
+    echo "MCP: https://morpheous-depth.vercel.app/api/mcp"
+    echo "actors: morpheous-depth api-swarm-alpha api-swarm-bravo"
+    fleet-bus state morpheous-depth 2>/dev/null || true
+    ls -la "$HOME/grok-inbox/fleet/actors/morpheous-depth/bin" 2>/dev/null || true
+    ;;
+  mcp-ping)
+    python3 "$HOME/grok-inbox/fleet/actors/morpheous-depth/lib/mcp_client.py" health
+    ;;
+  mix)
+    mkdir -p "$MIX"
+    cat > "$MIX/index.html" <<HTML
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Morpheous Depth — Fleet GUI</title>
+<style>
+body{font-family:system-ui,sans-serif;margin:0;background:#0b0f19;color:#e8eefc}
+header{padding:16px;background:#121a2b;border-bottom:1px solid #243044}
+a{color:#7dd3fc}
+.card{margin:16px;padding:16px;border:1px solid #243044;border-radius:12px;background:#121a2b}
+iframe{width:100%;height:70vh;border:0;border-radius:12px;background:#000}
+.btn{display:inline-block;margin:6px 8px 6px 0;padding:10px 14px;border-radius:10px;background:#2563eb;color:#fff;text-decoration:none}
+.links a{display:block;padding:8px 0}
+</style></head><body>
+<header>
+  <h1>Morpheous Depth</h1>
+  <p>Fleet GUI via MiXplorer — tap live links; Grok MCP deep research stays available.</p>
+  <a class="btn" href="https://morpheous-depth.vercel.app/">Open live UI</a>
+  <a class="btn" href="https://morpheous-depth.vercel.app/api/mcp">MCP endpoint</a>
+</header>
+<div class="card">
+  <h2>Embedded UI</h2>
+  <iframe src="https://morpheous-depth.vercel.app/" title="Morpheous Depth"></iframe>
+</div>
+<div class="card links">
+  <h2>Tap queries / live links</h2>
+  <div id="live"></div>
+</div>
+<script>
+fetch('live-links.json').then(r=>r.json()).then(d=>{
+  const el=document.getElementById('live');
+  (d.links||[]).forEach(u=>{
+    const a=document.createElement('a'); a.href=u; a.textContent=u; a.target='_blank'; el.appendChild(a);
+  });
+}).catch(()=>{document.getElementById('live').textContent='No live-links.json yet — run swarm fanout.';});
+</script>
+</body></html>
+HTML
+    echo '{"links":["https://morpheous-depth.vercel.app/","https://morpheous-depth.vercel.app/api/mcp"]}' > "$MIX/live-links.json"
+    echo "MiXplorer: $MIX/index.html"
+    command -v fleet-mix-mirror >/dev/null && fleet-mix-mirror once >/dev/null 2>&1 || true
+    ;;
+  deploy)
+    fleet-bus state termux-commander deploying "FC-002 morpheous-depth + api-swarm-alpha/bravo"
+    for a in morpheous-depth api-swarm-alpha api-swarm-bravo; do
+      fleet-bus state "$a" ready "FC-002 deployed skeleton"
+    done
+    "$0" mix
+    echo deployed
+    ;;
+  *)
+    echo "Usage: fleet-morpheous status|mcp-ping|mix|deploy"; exit 2;;
+esac

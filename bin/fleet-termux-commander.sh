@@ -136,6 +136,20 @@ cmd_status() {
   elev_run 'id -u; id -un' | head -3
 }
 
+
+cmd_enhance() {
+  bus state termux-commander enhancing "elevated Actor Enhancement Bot — revise/upgrade skeletons"
+  bus send termux-commander fleet-captain report "Commander elevating actor skeleton upgrades from Forge repos"
+  if command -v fleet-actor-enhance >/dev/null; then
+    fleet-actor-enhance all
+  else
+    echo "fleet-actor-enhance missing" >&2
+    exit 1
+  fi
+  bus state termux-commander adjusting "actor frameworks upgraded under Commander privilege"
+  bus send termux-commander fleet-captain report "Enhance complete — Captain may issue further agentic effort"
+}
+
 cmd_apply_directives() {
   # Hand project directives to Fleet Captain from Termux Commander + conversation file
   local doc="$HOME/grok-phone-bridge/PROJECT-DIRECTIVES.md"
@@ -153,11 +167,13 @@ case "${1:-}" in
   deploy-pending|deploy) cmd_deploy_pending ;;
   status) cmd_status ;;
   apply-directives) cmd_apply_directives ;;
+  enhance|upgrade|revise) cmd_enhance ;;
   *)
     cat <<'EOF'
 Usage:
   fleet-termux-commander apply-directives   # push PROJECT-DIRECTIVES to Fleet Captain
   fleet-termux-commander deploy-pending     # elevated deploy of twins from traffic report
+  fleet-termux-commander enhance            # elevated Actor Enhancement Bot (Forge→skeletons)
   fleet-termux-commander status
 
 Termux Commander has highest privilege to deploy/adjust Lackeys/Actors.

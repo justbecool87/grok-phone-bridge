@@ -125,3 +125,34 @@ fleet-elevated-monitor start
 fleet-elevated-monitor status
 # MiXplorer: /sdcard/Download/grok-inbox/fleet-monitor/ELEVATED-STATUS.txt
 ```
+
+
+## Directive FC-002 — Morpheous Depth MCP + swarm injectors
+
+**Status:** ACTIVE  
+**Issued:** 2026-09-27  
+**Project:** https://morpheous-depth.vercel.app/ (repo justbecool87/morpheous-depth)
+
+### Mission
+
+Wire the 23+ actor fleet into Morpheous Depth. Host buff MCP on Vercel. Deploy fleet bridge + two API swarm injector actors for expanded reach. Forge+Archivist+Courier thicken thin skeletons for deep research.
+
+### Deployed / required Lackeys
+
+| Callsign | Duty |
+|----------|------|
+| **Morpheous Depth** | MCP client/bridge; health + research calls |
+| **API Swarm Alpha** | Breadth/reach fan-out injectors into MCP data pulls |
+| **API Swarm Bravo** | Depth/weight payload pulls; aggregate for Archivist |
+| **Forge** | Standing order: collaborate with Archivist+Courier on skeleton upgrades |
+| **Archivist** | Index MCP tools; compact deep-research briefs |
+| **Courier** | Fetch MCP/sdk/deps + cache swarm payloads |
+| **Termux Commander** | Elevated deploy of the three new actors + mcp wire-up |
+
+### Acceptance
+
+- [ ] `/api/mcp` live on Vercel with health tool
+- [ ] Grok `mcp_servers.morpheous-depth` configured
+- [ ] Three new actors on roster + skeletons with bin CLIs
+- [ ] Alpha/Bravo demonstrably expand pull reach (parallel queries)
+- [ ] Forge triad upgrade pass on ≥3 thin skeletons
