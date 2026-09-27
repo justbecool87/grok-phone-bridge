@@ -269,6 +269,13 @@ PY
 tick() {
   archivist_efficiency
   publish_overlay
+  cnt_file="$OVER/suggest-tick.counter"
+  n=0
+  [[ -f "$cnt_file" ]] && n=$(cat "$cnt_file" 2>/dev/null || echo 0)
+  n=$((n+1)); echo "$n" > "$cnt_file"
+  if (( n % 5 == 0 )) && command -v fleet-captain-discretion >/dev/null; then
+    fleet-captain-discretion suggest >/dev/null 2>&1 || true
+  fi
 }
 
 cmd_start() {

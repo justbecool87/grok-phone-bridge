@@ -77,3 +77,8 @@ Standing orders live in **`PROJECT-DIRECTIVES.md`**. They come from **Termux Com
 - Traffic monitor every **5 minutes** → Fleet Captain (overburdened + idle).
 - Idle → assist **Forge** (learned skills).
 - Overburdened → Fleet Captain **deploy-request** → **Termux Commander** deploys new Lackey/Actor twins elevated.
+
+
+## Regulator suggestions vs Captain discretion
+
+Regulator and monitors answer to **Fleet Captain**. With **Archivist research**, they may suggest or (rarely, when marked safe) implement a faster or conflicting path. **Fleet Captain almost always has discretion** over Regulator suggestions and remaining delegation.

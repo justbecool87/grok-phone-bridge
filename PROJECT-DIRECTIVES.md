@@ -105,3 +105,27 @@ fleet-actor-enhance status
 fleet-regulator-overlay start
 fleet-regulator-overlay status
 ```
+
+
+## 10. Regulator / monitors under Fleet Captain — Archivist-backed alternate paths
+
+**Authority**
+- **Regulator** and **monitoring actors** operate under **Fleet Captain** authority.
+- They may **suggest** (and, when Archivist research supports it, **implement**) a **less time-consuming** or **potentially conflicting** execution path versus the Captain’s current plan.
+- Permission for those alternate paths comes from **Archivist research** (efficiency, conflict, time-cost briefs).
+- **Fleet Captain almost always retains discretion** on delegation from Regulator suggestions: approve, modify, hold, or override.
+
+**Protocol**
+1. Regulator/monitor detects cost, stall, conflict, or inefficiency.
+2. **Archivist** researches: time saved, conflict risk, token cost, P0/P1 impact.
+3. Regulator posts a **suggestion** on the superiors overlay for Fleet Captain (+ Termux Commander if deploy/elevate needed).
+4. Default: **await Captain discretion**. Fast-path implement only when Archivist marks `safe_auto=true` **and** Captain has not issued a hold — still report immediately to Captain.
+5. Captain decision is binding; Termux Commander executes elevated changes only on Captain directive or standing project orders.
+
+```bash
+fleet-captain-discretion status
+fleet-captain-discretion suggest     # Regulator+Archivist proposal
+fleet-captain-discretion approve <id>
+fleet-captain-discretion override <id>
+fleet-captain-discretion hold
+```
