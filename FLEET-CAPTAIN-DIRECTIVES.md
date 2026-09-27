@@ -110,3 +110,18 @@ Any Lackey Regulator Bot deems **idle** is immediately reassigned to help **Forg
 ```bash
 fleet-regulator-reassign scan
 ```
+
+
+### Elevated Permission Job Monitor (Regulator-linked)
+
+Priority hold/delegation framework:
+
+1. **P0** — pip / diffusers install (`svd-smith`, `quay`, `courier`) via elevated `nethunter -r`
+2. **P1** — GitHub Lackey Forge research/pull (`forge` + idle learned-skill helpers)
+3. **P2** — other FC-001 duties
+
+```bash
+fleet-elevated-monitor start
+fleet-elevated-monitor status
+# MiXplorer: /sdcard/Download/grok-inbox/fleet-monitor/ELEVATED-STATUS.txt
+```
