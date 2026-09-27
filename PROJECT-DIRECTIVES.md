@@ -191,3 +191,29 @@ If `api-swarm-alpha` / `api-swarm-bravo` are overburdened:
 2. Regulator reports to Fleet Captain with `directive_request=true`
 3. Captain issues `DEPLOY_SWARM_INJECTOR_ASSIST` → Termux Commander deploys aux injectors / reassigns available actors
 4. Preserve Morpheous buff MCP + Grok MCP deep-research paths
+
+## 14. FC-003 — Script Injector/Editor + Courier Memory ML + MCP Adapters
+
+**Elevated executors:** Forge + Archivist + Courier (Termux Commander privilege)
+
+### Script Injector / Editor
+- Actor: `script-injector` (+ aux)
+- Forge plugins: `microsoft/monaco-editor`, `prettier/prettier`
+- CLI: `script-inject status|stamp|plugins`
+
+### Courier Memory ML (every Courier twin)
+- Forge: `mem0ai/mem0`
+- CLI: `courier-memory status|add|search|list|regulatory`
+- Purpose: regulatory enhancement protocol memory for Regulator
+
+### MCP interoperability adapters
+- CLI: `fleet-mcp-adapt catalog|search|call`
+- Normalizes heterogeneous MCP JSON-RPC for efficient cross-server search/deploy
+- **Does not** circumvent authentication, tokens, TLS, or access controls
+
+```bash
+fleet-termux-commander deploy-morpheous   # if needed
+script-inject stamp
+courier-memory regulatory "…"
+fleet-mcp-adapt catalog
+```

@@ -180,11 +180,29 @@
       "deployed_by": "termux-commander",
       "privilege": "elevated",
       "project": "morpheous-depth"
+    },
+    {
+      "id": "script-injector",
+      "name": "Script Injector",
+      "specialty": "script injector/editor + coding plugins (monaco, prettier)",
+      "project": "fc-003",
+      "deployed_by": "termux-commander",
+      "privilege": "elevated"
+    },
+    {
+      "id": "script-injector-aux",
+      "name": "script-injector-aux",
+      "specialty": "twin of script-injector",
+      "relieves": "script-injector",
+      "reason": "elevated_fc003",
+      "deployed_by": "termux-commander",
+      "privilege": "elevated"
     }
   ],
-  "directive": "FC-002",
+  "directive": "FC-003",
   "directives_active": [
     "FC-001",
-    "FC-002"
+    "FC-002",
+    "FC-003"
   ]
 }

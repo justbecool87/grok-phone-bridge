@@ -1,0 +1,4 @@
+#!/data/data/com.termux/files/usr/bin/bash
+LIB="$HOME/grok-inbox/fleet/actors/script-injector/lib"
+export PYTHONPATH="$LIB${PYTHONPATH:+:$PYTHONPATH}"
+exec python3 "$LIB/inject_edit.py" "$@"

@@ -1,0 +1,2 @@
+#!/data/data/com.termux/files/usr/bin/bash
+exec python3 "$HOME/grok-inbox/fleet/mcp-adapters/protocol_adapter.py" "$@"

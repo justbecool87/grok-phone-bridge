@@ -1,0 +1,3 @@
+#!/data/data/com.termux/files/usr/bin/bash
+export COURIER_ACTOR=courier
+exec python3 "/data/data/com.termux/files/home/grok-inbox/fleet/actors/courier/lib/memory_ml_cli.py" "$@"
