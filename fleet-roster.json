@@ -61,6 +61,69 @@
       "id": "forge",
       "name": "Forge",
       "specialty": "GitHub research & repo pull"
+    },
+    {
+      "id": "scout-aux",
+      "name": "scout-aux",
+      "specialty": "twin of scout",
+      "relieves": "scout",
+      "reason": "high_traffic",
+      "deployed_by": "termux-commander",
+      "privilege": "elevated"
+    },
+    {
+      "id": "probe-aux",
+      "name": "probe-aux",
+      "specialty": "twin of probe",
+      "relieves": "probe",
+      "reason": "high_traffic",
+      "deployed_by": "termux-commander",
+      "privilege": "elevated"
+    },
+    {
+      "id": "harbor-aux",
+      "name": "harbor-aux",
+      "specialty": "twin of harbor",
+      "relieves": "harbor",
+      "reason": "busy_transit+traffic",
+      "deployed_by": "termux-commander",
+      "privilege": "elevated"
+    },
+    {
+      "id": "quay-aux",
+      "name": "quay-aux",
+      "specialty": "twin of quay",
+      "relieves": "quay",
+      "reason": "high_traffic",
+      "deployed_by": "termux-commander",
+      "privilege": "elevated"
+    },
+    {
+      "id": "archivist-aux",
+      "name": "archivist-aux",
+      "specialty": "twin of archivist",
+      "relieves": "archivist",
+      "reason": "busy_transit+traffic",
+      "deployed_by": "termux-commander",
+      "privilege": "elevated"
+    },
+    {
+      "id": "loom-aux",
+      "name": "loom-aux",
+      "specialty": "twin of loom",
+      "relieves": "loom",
+      "reason": "busy_transit+traffic",
+      "deployed_by": "termux-commander",
+      "privilege": "elevated"
+    },
+    {
+      "id": "forge-aux",
+      "name": "forge-aux",
+      "specialty": "twin of forge",
+      "relieves": "forge",
+      "reason": "high_traffic",
+      "deployed_by": "termux-commander",
+      "privilege": "elevated"
     }
   ],
   "directive": "FC-001"

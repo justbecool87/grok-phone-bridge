@@ -221,8 +221,13 @@ PY
   bus state fleet-captain reviewing "Lackey load report overburdened=$ob_n idle=$id_n"
 
   if [[ "$ob_n" -gt 0 ]]; then
-    local deploy_body
-    deploy_body=$(python3 -c 'import json;d=json.load(open("'"$REPORT"'"));print("; ".join(f"{o[\"actor\"]}=>{o[\"suggested_new_lackey\"]}" for o in d["overburdened"]))')
+        local deploy_body
+    deploy_body=$(python3 - "$REPORT" <<'PYB'
+import json, sys
+d = json.load(open(sys.argv[1]))
+print("; ".join(f"{o['actor']}=>{o['suggested_new_lackey']}" for o in d.get("overburdened", [])))
+PYB
+)
     # Fleet Captain duty: send Termux Commander for new Lackey/Actor deployment
     bus send fleet-captain termux-commander deploy-request "OVERBURDENED — deploy new Lackey/Actor twin(s): $deploy_body"
     bus state fleet-captain requesting-deploy "Termux Commander: $deploy_body"
