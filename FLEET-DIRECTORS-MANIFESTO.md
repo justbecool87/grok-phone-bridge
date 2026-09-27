@@ -59,3 +59,12 @@ Clone or pull this repo on the phone, keep this file as the fleet contract, and 
 Handed down Terminal Commander → Fleet Captain:
 
 - See **`FLEET-CAPTAIN-DIRECTIVES.md`** (FC-001: locate Messages video + Stable Video Diffusion enhance with 4 Lackeys: Scout, Probe, SVD Smith, Harbor).
+
+
+## Regulator rule — idle → assist Forge
+
+Any Lackey Regulator Bot deems **idle** is immediately reassigned to help **Forge** (GitHub Lackey), using skills already learned on FC-001 (path verify, probe/stats, SVD notes, fetch, deploy dirs, index, MiXplorer mirror, tree render). Idle is not allowed while Forge is researching/pulling.
+
+```bash
+fleet-regulator-reassign scan
+```

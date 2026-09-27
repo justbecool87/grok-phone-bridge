@@ -15,7 +15,7 @@ MIX_PKG="com.mixplorer.beta"
 MIX_VIEW="com.mixplorer.beta/com.mixplorer.activities.ContentViewerActivity"
 MIX_CODE="com.mixplorer.beta/com.mixplorer.activities.CodeEditorActivity"
 HTML="$MIRROR/index.html"
-LACKETS=(scout probe svd-smith harbor courier quay archivist loom)
+LACKETS=(scout probe svd-smith harbor courier quay archivist loom forge)
 
 mkdir -p "$REG" "$MIRROR" "$FLEET/bus" "$FLEET/state"
 touch "$SRC_LIVE" "$SRC_FEED"
@@ -101,6 +101,9 @@ publish() {
     fleet-bus send archivist fleet-captain report "RESEARCH protocol svd/PROTOCOL.md + motion bucket defaults" >/dev/null 2>&1 || true
 
     fleet-bus state loom priming-render "encoder path exports/ + audio mux plan" >/dev/null 2>&1 || true
+    fleet-bus state forge fetching "GitHub lean pack research/pull for actor libraries" >/dev/null 2>&1 || true
+    fleet-bus send forge fleet-captain report "FORGE pulling assist repos per actor" >/dev/null 2>&1 || true
+    fleet-bus state forge indexing "actor repo library under github-lackey/repos" >/dev/null 2>&1 || true
     fleet-bus send loom fleet-captain report "RENDER pipeline primed (no overwrite of source)" >/dev/null 2>&1 || true
 
     fleet-bus state harbor mirroring "MiXplorer LIVE feed + adb-to-grok inject path" >/dev/null 2>&1 || true
@@ -128,6 +131,11 @@ publish() {
     fleet-bus send fleet-captain "$L" ack "ACTIVE ACK — remain on $focus_transit" >/dev/null 2>&1 || true
     # re-assert focus transit after ACK (do not idle)
     fleet-bus state "$L" "$focus_transit" "post-ack continue duty" >/dev/null 2>&1 || true
+
+    # Regulator: idle Lackeys must assist GitHub Lackey (Forge) with learned skills
+    if command -v fleet-regulator-reassign >/dev/null 2>&1; then
+      fleet-regulator-reassign scan >/dev/null 2>&1 || true
+    fi
 
     {
       echo "╔══ FLEET PROJECT MONITOR  $(ts)  ACTIVE DUTIES ══╗"
