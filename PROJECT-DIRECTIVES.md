@@ -75,3 +75,33 @@ fleet-rest-reassign status
 ```
 
 Tunables: `FLEET_REST_WINDOW_SEC`, `FLEET_OVERBURDEN_MSGS`, `FLEET_IDLE_MSGS_MAX`, `FLEET_REST_MIN_SEC`, `FLEET_RESEARCH_ACTOR`
+
+
+## 8. Actor Enhancement Bot (Forge repos → live skeletons)
+
+All Forge-landed repos must be **implemented** with their most relevant actor via the **Actor Enhancement Bot**.
+
+- **Fleet Captain** commands enhancement / agentic effort.
+- **Termux Commander** is the elevated framework that **produces/revises/upgrades** actor coding skeletons on Captain command (`fleet-termux-commander enhance`).
+- Live coding packages (`ffmpeg-python`, `moviepy`, `huggingface_hub`, Diffusers) improve base actor frameworks — especially **SVD Smith** quality after pip finish.
+- Skeletons live under `~/grok-inbox/fleet/actors/<actor>/`.
+
+```bash
+fleet-actor-enhance all
+fleet-termux-commander enhance
+fleet-actor-enhance status
+```
+
+
+## 9. Regulator superiors overlay + Enhancement Bot token growth
+
+- **Regulator** publishes a **superiors-only fleet board overlay** in MiXplorer for communication with **Fleet Captain** and **Termux Commander**:
+  `/sdcard/Download/grok-inbox/fleet-monitor/REGULATOR-SUPERIORS/`
+- **Fleet Captain** analyzes Enhancement Bot monitoring from Regulator (token/work proxy growth).
+- If Enhancement Bot is **not growing** in token/work usage → Fleet Captain issues a **directive to Termux Commander** to resume/revise/elevate enhance.
+- **Archivist** assists Enhancement Bot **token efficiency** (compact logs, high-signal briefs) so tokens are not wasted.
+
+```bash
+fleet-regulator-overlay start
+fleet-regulator-overlay status
+```
