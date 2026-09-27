@@ -68,3 +68,12 @@ Any Lackey Regulator Bot deems **idle** is immediately reassigned to help **Forg
 ```bash
 fleet-regulator-reassign scan
 ```
+
+
+## Project directives (Fleet Captain)
+
+Standing orders live in **`PROJECT-DIRECTIVES.md`**. They come from **Termux Commander** (highest privilege deploy/adjust) and from **owner conversation**.
+
+- Traffic monitor every **5 minutes** → Fleet Captain (overburdened + idle).
+- Idle → assist **Forge** (learned skills).
+- Overburdened → Fleet Captain **deploy-request** → **Termux Commander** deploys new Lackey/Actor twins elevated.
