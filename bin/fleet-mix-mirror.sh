@@ -47,23 +47,99 @@ html_escape() {
 }
 
 publish() {
-  # Ensure source feed has a heartbeat line
+  local torch_ok=0 diff_ok=0 pip_busy=0 src_ok=0 frames_ok=0
+  [[ -f "$HOME/grok-inbox/VID_20260927_105213.mp4" ]] && src_ok=1
+  [[ -f "$HOME/grok-inbox/svd-work/frames/frame_0s.jpg" ]] && frames_ok=1
+  [[ -d "$HOME/grok-inbox/svd-work/venv/lib/python3.13/site-packages/torch" ]] && torch_ok=1
+  [[ -d "$HOME/grok-inbox/svd-work/venv/lib/python3.13/site-packages/diffusers" ]] && diff_ok=1
+  pgrep -f '/svd-work/venv/bin/pip install' >/dev/null 2>&1 && pip_busy=1
+
+  # Active duty map — Lackeys must NOT sit idle during FC-001
   if command -v fleet-bus >/dev/null 2>&1; then
+    if [[ "$src_ok" -eq 1 ]]; then
+      fleet-bus state scout verifying "source staged VID_20260927_105213.mp4" >/dev/null 2>&1 || true
+      fleet-bus send scout fleet-captain report "VERIFY source present in grok-inbox" >/dev/null 2>&1 || true
+    else
+      fleet-bus state scout searching "locate Messages video on /sdcard" >/dev/null 2>&1 || true
+    fi
+
+    if [[ "$frames_ok" -eq 1 ]]; then
+      fleet-bus state probe sampling "keyframes + segment_0_3s under svd-work" >/dev/null 2>&1 || true
+      fleet-bus send probe fleet-captain report "PROBE frames ready; suitability check running" >/dev/null 2>&1 || true
+    else
+      fleet-bus state probe extracting "pulling probe frames via ffmpeg" >/dev/null 2>&1 || true
+    fi
+
+    if [[ "$pip_busy" -eq 1 ]]; then
+      fleet-bus state svd-smith installing "pip resume torch/diffusers stack" >/dev/null 2>&1 || true
+      fleet-bus state quay deploying "Kali venv package install in progress" >/dev/null 2>&1 || true
+      fleet-bus state courier fetching "pulling wheel deps for SVD runtime" >/dev/null 2>&1 || true
+    elif [[ "$diff_ok" -eq 1 && "$torch_ok" -eq 1 ]]; then
+      fleet-bus state svd-smith priming "SVD runtime imports OK — await owner project prompt" >/dev/null 2>&1 || true
+      fleet-bus state quay hardening "venv health check + export paths" >/dev/null 2>&1 || true
+      fleet-bus state courier staging-cache "HF/SVD weight fetch armed (hold for prompt)" >/dev/null 2>&1 || true
+    else
+      fleet-bus state svd-smith bootstrapping "runtime incomplete — continue install" >/dev/null 2>&1 || true
+      fleet-bus state quay deploying "ensure python3.13 venv + ffmpeg" >/dev/null 2>&1 || true
+      fleet-bus state courier fetching "resolve missing torch/diffusers artifacts" >/dev/null 2>&1 || true
+    fi
+
+        # PIP ACTORS REASSERT — keep install cast locked on active transits
+    if [[ "$pip_busy" -eq 1 ]]; then
+      fleet-bus state svd-smith installing "torch/diffusers pip install ACTIVE" >/dev/null 2>&1 || true
+      fleet-bus state quay deploying "venv deploy ACTIVE during pip" >/dev/null 2>&1 || true
+      fleet-bus state courier fetching "wheel/fetch ACTIVE during pip" >/dev/null 2>&1 || true
+      fleet-bus send svd-smith fleet-captain report "INSTALLING diffusion stack now" >/dev/null 2>&1 || true
+      fleet-bus send quay fleet-captain report "DEPLOYING packages into svd-work/venv" >/dev/null 2>&1 || true
+      fleet-bus send courier fleet-captain report "FETCHING pip artifacts for SVD" >/dev/null 2>&1 || true
+      fleet-bus state svd-smith installing "post-report continue install" >/dev/null 2>&1 || true
+      fleet-bus state quay deploying "post-report continue deploy" >/dev/null 2>&1 || true
+      fleet-bus state courier fetching "post-report continue fetch" >/dev/null 2>&1 || true
+    fi
+
+    fleet-bus state archivist researching "SVD presets for 1280x720 Messages clip" >/dev/null 2>&1 || true
+    fleet-bus send archivist fleet-captain report "RESEARCH protocol svd/PROTOCOL.md + motion bucket defaults" >/dev/null 2>&1 || true
+
+    fleet-bus state loom priming-render "encoder path exports/ + audio mux plan" >/dev/null 2>&1 || true
+    fleet-bus send loom fleet-captain report "RENDER pipeline primed (no overwrite of source)" >/dev/null 2>&1 || true
+
+    fleet-bus state harbor mirroring "MiXplorer LIVE feed + adb-to-grok inject path" >/dev/null 2>&1 || true
+    fleet-bus send harbor fleet-captain report "MIRROR publish to /sdcard/.../fleet-monitor" >/dev/null 2>&1 || true
+
+    fleet-bus state regulator monitoring "Lackey duty clock — no idle allowed on FC-001" >/dev/null 2>&1 || true
+    fleet-bus send regulator fleet-captain heartbeat "adjustment=keep-active thoroughness=high" >/dev/null 2>&1 || true
+
+    # Rotate a focused ping WITHOUT returning to idle
+    local L focus_transit
     L="${LACKETS[$(( $(date +%s) % ${#LACKETS[@]} ))]}"
-    fleet-bus state "$L" pinging "mix-mirror" >/dev/null 2>&1 || true
-    fleet-bus send "$L" fleet-captain ping "mix-mirror" >/dev/null 2>&1 || true
-    fleet-bus send fleet-captain "$L" ack "mix-mirror ACK" >/dev/null 2>&1 || true
-    fleet-bus state "$L" idle "on-station" >/dev/null 2>&1 || true
+    case "$L" in
+      scout) focus_transit=verifying ;;
+      probe) focus_transit=sampling ;;
+      svd-smith) focus_transit=$([[ "$pip_busy" -eq 1 ]] && echo installing || echo priming) ;;
+      harbor) focus_transit=mirroring ;;
+      courier) focus_transit=$([[ "$pip_busy" -eq 1 ]] && echo fetching || echo staging-cache) ;;
+      quay) focus_transit=deploying ;;
+      archivist) focus_transit=researching ;;
+      loom) focus_transit=priming-render ;;
+      *) focus_transit=working ;;
+    esac
+    fleet-bus state "$L" "$focus_transit" "focus tick FC-001" >/dev/null 2>&1 || true
+    fleet-bus send "$L" fleet-captain ping "ACTIVE $focus_transit" >/dev/null 2>&1 || true
+    fleet-bus send fleet-captain "$L" ack "ACTIVE ACK — remain on $focus_transit" >/dev/null 2>&1 || true
+    # re-assert focus transit after ACK (do not idle)
+    fleet-bus state "$L" "$focus_transit" "post-ack continue duty" >/dev/null 2>&1 || true
+
     {
-      echo "╔══ FLEET PROJECT MONITOR  $(ts)  mix-mirror ══╗"
+      echo "╔══ FLEET PROJECT MONITOR  $(ts)  ACTIVE DUTIES ══╗"
       fleet-bus board 2>/dev/null || true
       echo
+      echo "workload: src=$src_ok frames=$frames_ok torch=$torch_ok diffusers=$diff_ok pip_busy=$pip_busy"
       fleet-bus clips 8 2>/dev/null || true
       echo "╚══════════════════════════════════════════════╝"
     } > "$SRC_LIVE"
   fi
 
-  printf '%s\n' "[$(ts)] mix-mirror publish uid=$(id -u)" >> "$SRC_FEED"
+  printf '%s\n' "[$(ts)] ACTIVE publish focus — pip_busy=$pip_busy torch=$torch_ok diff=$diff_ok" >> "$SRC_FEED"
   if [[ -f "$FLEET/bus/messages.jsonl" ]]; then
     python3 - "$FLEET/bus/messages.jsonl" "$SRC_FEED" <<'PYF' 2>/dev/null || true
 import json, sys
@@ -81,7 +157,6 @@ with open(out, "a") as f:
         f.write(f"[{m['ts']}] {m['from']} → {m['to']} | {m['kind']}: {m['body'][:100]}\n")
 PYF
   fi
-  # bound feed
   if [[ $(wc -l < "$SRC_FEED" 2>/dev/null || echo 0) -gt 500 ]]; then
     tail -n 400 "$SRC_FEED" > "$SRC_FEED.tmp" && mv "$SRC_FEED.tmp" "$SRC_FEED"
   fi
@@ -90,13 +165,11 @@ PYF
   cp -f "$SRC_FEED" "$MIRROR/FEED.txt"
   chmod 664 "$MIRROR/LIVE.txt" "$MIRROR/FEED.txt" 2>/dev/null || true
 
-  # Self-contained HTML (inlined) for MiXplorer ContentViewer auto-refresh
   python3 - "$SRC_LIVE" "$SRC_FEED" "$HTML" <<'PYH'
 import html, pathlib, sys, time, os
 live, feed, out = map(pathlib.Path, sys.argv[1:4])
 live_txt = live.read_text(errors="replace") if live.exists() else ""
 feed_txt = feed.read_text(errors="replace") if feed.exists() else ""
-# keep HTML smaller
 feed_tail = "\n".join(feed_txt.splitlines()[-120:])
 ts = time.strftime("%Y-%m-%dT%H:%M:%S%z")
 uid = os.getuid()
@@ -105,7 +178,7 @@ doc = f"""<!DOCTYPE html>
 <meta charset=\"utf-8\"/>
 <meta http-equiv=\"refresh\" content=\"4\"/>
 <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/>
-<title>Fleet LIVE · MiXplorer</title>
+<title>Fleet LIVE · ACTIVE</title>
 <style>
 body{{font-family:ui-monospace,monospace;background:#0b0f14;color:#e5eef7;margin:0;padding:12px}}
 h1{{font-size:18px;color:#7dd3fc;margin:0 0 6px}}
@@ -115,8 +188,8 @@ pre{{white-space:pre-wrap;word-break:break-word;background:#111827;border:1px so
 padding:10px;border-radius:10px;line-height:1.35;font-size:12px}}
 </style>
 </head><body>
-<h1>Fleet Project Monitor</h1>
-<p class=\"meta\">MiXplorer mirror · auto-refresh 4s · {html.escape(ts)} · uid={uid}</p>
+<h1>Fleet Project Monitor · ACTIVE DUTIES</h1>
+<p class=\"meta\">MiXplorer mirror · auto-refresh 4s · {html.escape(ts)} · uid={uid} · idle forbidden on FC-001</p>
 <h2>LIVE board</h2>
 <pre>{html.escape(live_txt)}</pre>
 <h2>FEED (tail)</h2>

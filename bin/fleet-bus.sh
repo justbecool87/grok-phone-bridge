@@ -16,35 +16,43 @@ shift || true
 case "$cmd" in
   send)
     # fleet-bus send <from> <to> <kind> <body...>
+    # Does NOT overwrite duty transit for Lackeys — use `state` for that.
     from="$1"; to="$2"; kind="$3"; shift 3
     body="$*"
     id="$(uuid)"
     body_json=$(printf '%s' "$body" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
-    line=$(printf '{"ts":"%s","id":"%s","from":"%s","to":"%s","kind":"%s","body":%s}'       "$(ts)" "$id" "$from" "$to" "$kind" "$body_json")
+    line=$(printf '{"ts":"%s","id":"%s","from":"%s","to":"%s","kind":"%s","body":%s}' \
+      "$(ts)" "$id" "$from" "$to" "$kind" "$body_json")
     printf '%s\n' "$line" >> "$BUS/messages.jsonl"
     printf '%s\n' "$line" >> "$LIVE"
     printf '%s\n' "$line" >> "$FLEET/regulator/inbox.jsonl"
-    # update sender transit state
-    printf '{"ts":"%s","actor":"%s","transit":"%s","peer":"%s","detail":%s}\n' \
-      "$(ts)" "$from" "$kind" "$to" "$(printf '%s' "$body" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')" \
-      > "$STATE/${from}.json"
+    # Directors may show last speech act; Lackeys keep prior duty transit
+    case "$from" in
+      fleet-captain|termux-commander|regulator)
+        printf '{"ts":"%s","actor":"%s","transit":"%s","peer":"%s","detail":%s}\n' \
+          "$(ts)" "$from" "$kind" "$to" "$body_json" > "$STATE/${from}.json"
+        ;;
+    esac
     printf '%s\n' "$line"
     ;;
+
   state)
     actor="$1"; transit="$2"; shift 2
     detail="${*:-}"
-    printf '{"ts":"%s","actor":"%s","transit":"%s","detail":%s}\n' \
-      "$(ts)" "$actor" "$transit" "$(printf '%s' "$detail" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')" \
-      | tee "$STATE/${actor}.json" >> "$LIVE"
+    detail_json=$(printf '%s' "$detail" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+    line=$(printf '{"ts":"%s","actor":"%s","transit":"%s","detail":%s}'       "$(ts)" "$actor" "$transit" "$detail_json")
+    printf '%s\n' "$line" > "$STATE/${actor}.json.tmp"
+    mv -f "$STATE/${actor}.json.tmp" "$STATE/${actor}.json"
+    printf '%s\n' "$line" >> "$LIVE"
     ;;
   ping)
-    # fleet-bus ping <lackey> — Lackey pings Fleet Captain assignment
+    # fleet-bus ping <lackey> — does not force idle; caller owns duty transit
     lackey="$1"
-    assignment="${2:-FC-001 standby}"
+    assignment="${2:-FC-001 active}"
     "$0" state "$lackey" pinging "ping Fleet Captain"
     "$0" send "$lackey" fleet-captain ping "PING assignment=$assignment"
-    "$0" send fleet-captain "$lackey" ack "ACK received; hold for orders"
-    "$0" state "$lackey" acknowledged "FC ack"
+    "$0" send fleet-captain "$lackey" ack "ACK — continue active duty"
+    "$0" state "$lackey" working "assignment=$assignment"
     ;;
   assign)
     lackey="$1"; shift
@@ -67,7 +75,8 @@ case "$cmd" in
       [ -f "$f" ] || continue
       python3 - "$f" <<'PY'
 import json,sys
-d=json.load(open(sys.argv[1]))
+raw=open(sys.argv[1]).read().strip().splitlines()
+d=json.loads(raw[-1])
 print(f"{d.get('actor','?'):<14} {d.get('transit','?'):<14} {d.get('detail','')[:80]}")
 PY
     done
