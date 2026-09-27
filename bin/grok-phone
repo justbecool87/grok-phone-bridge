@@ -1,0 +1,314 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# On-device Grok bridge for Moto G (Termux + local ADB).
+# Search phone storage, stage into ~/grok-inbox, inject prompts into live Grok.
+set -euo pipefail
+
+export HOME="${HOME:-/data/data/com.termux/files/home}"
+PREFIX="/data/data/com.termux/files/usr"
+export PATH="$HOME/bin:$PREFIX/bin:$PATH"
+
+INBOX="${GROK_INBOX:-$HOME/grok-inbox}"
+SD_INBOX="${GROK_SD_INBOX:-/sdcard/Download/grok-inbox}"
+DEFAULT_ROOTS=(/sdcard/Download /sdcard/DCIM /sdcard/Pictures /sdcard/Documents /sdcard/Movies)
+
+usage() {
+  cat <<'EOF'
+grok-phone — on-device storage + Grok session bridge (Moto G / Termux)
+
+Usage:
+  grok-phone status
+  grok-phone search <query> [root...]
+  grok-phone stage <path...>                 # copy into ~/grok-inbox
+  grok-phone stage-search <query> [root...]  # search then stage matches
+  grok-phone say <text...>                   # inject into live grok TUI
+  grok-phone upload <path...> [--say text]   # stage + optional inject
+  grok-phone upload-search <query> [root...] [--say text]
+  grok-phone inbox                           # list staged files
+  grok-phone adb-sh <cmd...>                 # adb shell as this device
+  grok-phone help
+
+Env:
+  GROK_INBOX     Termux staging dir (default ~/grok-inbox)
+  GROK_SD_INBOX  Shared /sdcard staging (default /sdcard/Download/grok-inbox)
+  ANDROID_SERIAL Override adb serial (default: first device)
+EOF
+}
+
+ensure_inbox() {
+  mkdir -p "$INBOX" "$SD_INBOX"
+}
+
+adb_bin() {
+  command -v adb >/dev/null || {
+    echo "adb not found on PATH" >&2
+    exit 1
+  }
+}
+
+adb_serial() {
+  if [ -n "${ANDROID_SERIAL:-}" ]; then
+    echo "$ANDROID_SERIAL"
+    return
+  fi
+  adb devices 2>/dev/null | awk 'NR>1 && $2=="device" {print $1; exit}'
+}
+
+adb_sh() {
+  adb_bin
+  local serial
+  serial=$(adb_serial)
+  if [ -z "$serial" ]; then
+    echo "no adb device" >&2
+    exit 1
+  fi
+  adb -s "$serial" shell "$@"
+}
+
+safe_name() {
+  local base
+  base=$(basename "$1")
+  # collapse awkward whitespace for Termux paths; keep extension
+  printf '%s' "$base" | tr ' /' '__'
+}
+
+stage_one() {
+  local src="$1"
+  local dest_name dest sd_dest
+  if [ ! -e "$src" ]; then
+    echo "missing: $src" >&2
+    return 1
+  fi
+  dest_name=$(safe_name "$src")
+  dest="$INBOX/$dest_name"
+  sd_dest="$SD_INBOX/$dest_name"
+  if [ -d "$src" ]; then
+    mkdir -p "$dest" "$sd_dest"
+    cp -a "$src"/. "$dest"/
+    cp -a "$src"/. "$sd_dest"/ 2>/dev/null || true
+  else
+    cp -f "$src" "$dest"
+    cp -f "$src" "$sd_dest" 2>/dev/null || true
+  fi
+  printf '%s\n' "$dest"
+}
+
+do_search() {
+  local query="$1"
+  shift || true
+  local roots=("$@")
+  if [ ${#roots[@]} -eq 0 ]; then
+    roots=("${DEFAULT_ROOTS[@]}")
+  fi
+  local root
+  for root in "${roots[@]}"; do
+    [ -d "$root" ] || continue
+    # Case-insensitive name match; skip huge system trees
+    find "$root" -type f \( -iname "*${query}*" \) 2>/dev/null | head -n 200
+  done
+}
+
+cmd_status() {
+  ensure_inbox
+  echo "host=moto-g-termux"
+  echo "inbox=$INBOX"
+  echo "sd_inbox=$SD_INBOX"
+  adb_bin
+  echo -n "adb_devices="
+  adb devices -l | tr '\n' '|'
+  echo
+  if command -v adb-to-grok >/dev/null; then
+    adb-to-grok status || echo "grok=down"
+  fi
+  echo -n "inbox_count="
+  find "$INBOX" -maxdepth 1 -type f 2>/dev/null | wc -l
+}
+
+cmd_search() {
+  if [ $# -lt 1 ]; then
+    echo "usage: grok-phone search <query> [root...]" >&2
+    exit 2
+  fi
+  do_search "$@"
+}
+
+cmd_stage() {
+  ensure_inbox
+  if [ $# -lt 1 ]; then
+    echo "usage: grok-phone stage <path...>" >&2
+    exit 2
+  fi
+  local p staged=()
+  for p in "$@"; do
+    staged+=("$(stage_one "$p")")
+  done
+  printf 'staged %s file(s):\n' "${#staged[@]}"
+  printf '  %s\n' "${staged[@]}"
+}
+
+cmd_stage_search() {
+  if [ $# -lt 1 ]; then
+    echo "usage: grok-phone stage-search <query> [root...]" >&2
+    exit 2
+  fi
+  ensure_inbox
+  local query="$1"
+  shift || true
+  local hits
+  mapfile -t hits < <(do_search "$query" "$@")
+  if [ ${#hits[@]} -eq 0 ]; then
+    echo "no matches for: $query"
+    exit 1
+  fi
+  echo "matches=${#hits[@]}"
+  printf '%s\n' "${hits[@]}"
+  echo "--- staging ---"
+  local h staged=()
+  for h in "${hits[@]}"; do
+    staged+=("$(stage_one "$h")")
+  done
+  printf 'staged %s file(s) into %s\n' "${#staged[@]}" "$INBOX"
+  printf '%s\n' "${staged[@]}"
+}
+
+cmd_say() {
+  if [ $# -lt 1 ]; then
+    echo "usage: grok-phone say <text...>" >&2
+    exit 2
+  fi
+  adb-to-grok say "$*"
+}
+
+# Parse trailing --say text from argv; sets SAY_TEXT and remaining FILES array via nameref-ish globals
+SAY_TEXT=""
+FILES=()
+
+parse_upload_args() {
+  SAY_TEXT=""
+  FILES=()
+  local seeing_say=0
+  local arg
+  for arg in "$@"; do
+    if [ "$seeing_say" -eq 1 ]; then
+      if [ -n "$SAY_TEXT" ]; then
+        SAY_TEXT="$SAY_TEXT $arg"
+      else
+        SAY_TEXT="$arg"
+      fi
+      continue
+    fi
+    if [ "$arg" = "--say" ]; then
+      seeing_say=1
+      continue
+    fi
+    FILES+=("$arg")
+  done
+}
+
+cmd_upload() {
+  ensure_inbox
+  parse_upload_args "$@"
+  if [ ${#FILES[@]} -eq 0 ]; then
+    echo "usage: grok-phone upload <path...> [--say text]" >&2
+    exit 2
+  fi
+  local p staged=()
+  for p in "${FILES[@]}"; do
+    staged+=("$(stage_one "$p")")
+  done
+  printf 'staged %s file(s):\n' "${#staged[@]}"
+  printf '  %s\n' "${staged[@]}"
+  local msg
+  if [ -n "$SAY_TEXT" ]; then
+    msg="$SAY_TEXT"
+  else
+    msg="Owner staged files into $INBOX via grok-phone. Please read:"
+    local s
+    for s in "${staged[@]}"; do
+      msg="$msg $s"
+    done
+  fi
+  adb-to-grok say "$msg"
+}
+
+cmd_upload_search() {
+  ensure_inbox
+  if [ $# -lt 1 ]; then
+    echo "usage: grok-phone upload-search <query> [root...] [--say text]" >&2
+    exit 2
+  fi
+  # Split query/roots from optional --say
+  local query="$1"
+  shift || true
+  local roots=()
+  SAY_TEXT=""
+  local seeing_say=0
+  local arg
+  for arg in "$@"; do
+    if [ "$seeing_say" -eq 1 ]; then
+      if [ -n "$SAY_TEXT" ]; then SAY_TEXT="$SAY_TEXT $arg"; else SAY_TEXT="$arg"; fi
+      continue
+    fi
+    if [ "$arg" = "--say" ]; then
+      seeing_say=1
+      continue
+    fi
+    roots+=("$arg")
+  done
+  local hits
+  mapfile -t hits < <(do_search "$query" "${roots[@]+"${roots[@]}"}")
+  if [ ${#hits[@]} -eq 0 ]; then
+    echo "no matches for: $query"
+    exit 1
+  fi
+  echo "matches=${#hits[@]}"
+  printf '%s\n' "${hits[@]}"
+  local h staged=()
+  for h in "${hits[@]}"; do
+    staged+=("$(stage_one "$h")")
+  done
+  printf 'staged %s -> %s\n' "${#staged[@]}" "$INBOX"
+  printf '%s\n' "${staged[@]}"
+  local msg
+  if [ -n "$SAY_TEXT" ]; then
+    msg="$SAY_TEXT"
+  else
+    msg="Owner upload-search '$query' staged ${#staged[@]} file(s) into $INBOX. Please read:"
+    local s
+    for s in "${staged[@]}"; do
+      msg="$msg $s"
+    done
+  fi
+  adb-to-grok say "$msg"
+}
+
+cmd_inbox() {
+  ensure_inbox
+  echo "INBOX=$INBOX"
+  find "$INBOX" -maxdepth 2 \( -type f -o -type d \) 2>/dev/null | sed 's|^|  |'
+  echo "SD_INBOX=$SD_INBOX"
+  find "$SD_INBOX" -maxdepth 2 -type f 2>/dev/null | sed 's|^|  |' || true
+}
+
+main() {
+  local sub="${1:-help}"
+  shift || true
+  case "$sub" in
+    status) cmd_status "$@" ;;
+    search) cmd_search "$@" ;;
+    stage) cmd_stage "$@" ;;
+    stage-search) cmd_stage_search "$@" ;;
+    say) cmd_say "$@" ;;
+    upload) cmd_upload "$@" ;;
+    upload-search) cmd_upload_search "$@" ;;
+    inbox) cmd_inbox "$@" ;;
+    adb-sh) adb_sh "$@" ;;
+    -h|--help|help) usage ;;
+    *)
+      echo "unknown: $sub" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+}
+
+main "$@"

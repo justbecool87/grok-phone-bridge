@@ -1,0 +1,83 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# Inject a prompt into the live Grok Build TUI on this phone (Moto G).
+# Finds grok even when the binary is named grok-*-linux-* (pidof grok fails).
+set -euo pipefail
+
+export HOME="${HOME:-/data/data/com.termux/files/home}"
+export PATH="$HOME/bin:/data/data/com.termux/files/usr/bin:$PATH"
+
+find_grok_pid() {
+  local pid cmd
+  # Prefer the real binary under proot, not the proot wrapper itself.
+  while read -r pid cmd; do
+    [ -n "${pid:-}" ] || continue
+    case "$cmd" in
+      *proot*) continue ;;
+      *grok-*-linux*|*/*.grok/downloads/grok*|*/.grok/downloads/grok*|*/bin/grok\ *|*/bin/grok)
+        if [ -e "/proc/$pid/fd/0" ]; then
+          echo "$pid"
+          return 0
+        fi
+        ;;
+    esac
+  done < <(pgrep -af 'grok' 2>/dev/null || true)
+
+  # Fallback: any non-proot cmdline containing grok downloads path
+  while read -r pid; do
+    [ -n "${pid:-}" ] || continue
+    cmd=$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)
+    case "$cmd" in
+      *proot*) continue ;;
+      *grok*)
+        if [ -e "/proc/$pid/fd/0" ]; then
+          echo "$pid"
+          return 0
+        fi
+        ;;
+    esac
+  done < <(pgrep -f 'grok' 2>/dev/null || true)
+  return 1
+}
+
+cmd="${1:-say}"
+case "$cmd" in
+  status|pid)
+    GP=$(find_grok_pid || true)
+    if [ -z "${GP:-}" ]; then
+      echo "no grok process"
+      exit 1
+    fi
+    echo "pid=$GP"
+    echo -n "cmdline="; tr '\0' ' ' < "/proc/$GP/cmdline"; echo
+    ls -l "/proc/$GP/fd/0" 2>/dev/null || true
+    exit 0
+    ;;
+  say|send|"")
+    if [ "$cmd" = "say" ] || [ "$cmd" = "send" ]; then
+      shift || true
+    fi
+    ;;
+  -h|--help|help)
+    cat <<'EOF'
+Usage:
+  adb-to-grok status          # show live grok pid
+  adb-to-grok say <text...>  # inject one line into TUI stdin
+  adb-to-grok <text...>      # same as say
+  echo text | adb-to-grok say
+EOF
+    exit 0
+    ;;
+esac
+
+GP=$(find_grok_pid || true)
+if [ -z "${GP:-}" ]; then
+  echo "no grok process" >&2
+  exit 1
+fi
+
+if [ $# -eq 0 ]; then
+  cat > "/proc/$GP/fd/0"
+else
+  printf '%s\n' "$*" > "/proc/$GP/fd/0"
+fi
+echo "sent to grok pid $GP"
