@@ -1,0 +1,18 @@
+--- current/.termux/boot/20-opencode-serve.sh	2026-10-19 12:49:51.000000000 -0500
++++ 20-opencode-serve.sh.draft	2026-10-19 21:47:04.410179103 -0500
+@@ -1,5 +1,13 @@
+ #!/data/data/com.termux/files/usr/bin/bash
++# DRAFT (ord-010) — NOT INSTALLED. Same as current 20-opencode-serve.sh but serve runs in its own
++# session (setsid -f), plus a report-only post-restart tunnel check. Owner OK required to install.
+ export PATH=$HOME/bin:$PREFIX/bin:$PATH
+ (echo >/dev/tcp/127.0.0.1/4096) 2>/dev/null && exit 0
+-if command -v opencode >/dev/null; then nohup opencode serve --hostname 127.0.0.1 --port 4096 >$HOME/tmp/opencode-serve.log 2>&1 &
+-else nohup proot-distro login ubuntu -- bash -lc 'opencode serve --hostname 127.0.0.1 --port 4096' >$HOME/tmp/opencode-serve.log 2>&1 & fi
++if command -v opencode >/dev/null; then setsid -f nohup opencode serve --hostname 127.0.0.1 --port 4096 >$HOME/tmp/opencode-serve.log 2>&1 </dev/null
++else setsid -f nohup proot-distro login ubuntu -- bash -lc 'opencode serve --hostname 127.0.0.1 --port 4096' >$HOME/tmp/opencode-serve.log 2>&1 </dev/null; fi
++# post-restart tunnel check: REPORT ONLY, never relaunch or kill
++( sleep 20
++  for f in '18022:127.0.0.1:8022' '2223:127.0.0.1:2080'; do
++    pgrep -f "$f" >/dev/null && s=present || s=MISSING
++    echo "$(date '+%F %T') post-serve-restart forward $f $s"
++  done >>"$HOME/tmp/serve-restart-tunnel-check.log" ) </dev/null >/dev/null 2>&1 &
