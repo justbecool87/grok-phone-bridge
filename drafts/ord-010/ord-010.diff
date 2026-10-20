@@ -1,0 +1,178 @@
+--- current/bin/codespace-termux-tunnel	2026-10-16 16:05:41.000000000 -0500
++++ tunnel-sup.draft	2026-10-19 21:42:33.558179103 -0500
+@@ -1,101 +1,67 @@
+ #!/data/data/com.termux/files/usr/bin/bash
+-# Reverse-tunnel Termux sshd into a GitHub Codespace.
+-# Codespace can then: ssh -p 18022 -i ~/.ssh/id_ed25519_codespace_termux u0_a513@127.0.0.1
+-# Requires: gh token with codespace scope, SOCKS2080 open, local sshd on 8022.
+-set -euo pipefail
++# DRAFT (ord-010) — NOT INSTALLED. Owner OK required to install, first launch, or kill 19325/19366.
++# tunnel-sup <name>: per-forward supervisor. Start detached with:  setsid -f tunnel-sup <name>
++#   names: r18022  (Codespace 127.0.0.1:18022 -> phone 127.0.0.1:8022)
++#          r2223   (Codespace 2223           -> phone 127.0.0.1:2080 SOCKS)
++# Mirrors codespace-termux-tunnel / start-r2223.sh ssh options exactly. Never kills other forwards.
++set -u
+ export HOME="${HOME:-/data/data/com.termux/files/home}"
+ export PATH="$HOME/bin:/data/data/com.termux/files/usr/bin:$PATH"
+-
+-CS_NAME="${CODESPACE_NAME:-orange-guacamole-69wg645vq95p356j}"
+-REMOTE_PORT="${REVERSE_PORT:-18022}"
+-LOCAL_PORT="${TERMUX_SSH_PORT:-8022}"
+-KEY="${CODESPACE_TERMUX_KEY:-$HOME/.ssh/id_ed25519_codespace_termux}"
+-USER_NAME="$(whoami)"
+-
+-cmd="${1:-up}"
+-
+-ensure_sshd() {
+-  if ! (echo >/dev/tcp/127.0.0.1/"$LOCAL_PORT") 2>/dev/null; then
+-    sshd 2>/dev/null || true
+-    sleep 1
+-  fi
+-  if ! (echo >/dev/tcp/127.0.0.1/"$LOCAL_PORT") 2>/dev/null; then
+-    echo "Termux sshd not listening on :$LOCAL_PORT" >&2
+-    exit 1
+-  fi
++CS="${CODESPACE_NAME:-orange-guacamole-69wg645vq95p356j}"
++NAME="${1:?usage: tunnel-sup r18022|r2223}"
++case "$NAME" in
++  r18022) SPEC="127.0.0.1:18022:127.0.0.1:8022"; RPORT=18022; LPORT=8022 ;;
++  r2223)  SPEC="2223:127.0.0.1:2080";            RPORT=2223;  LPORT=2080 ;;
++  *) echo "unknown forward $NAME" >&2; exit 2 ;;
++esac
++STATE="$HOME/grok-inbox/fleet/state/tunnel-sup.json"
++LOG="$HOME/tmp/tunnel-sup-$NAME.log"
++LOCK="$HOME/tmp/tunnel-sup-$NAME.lock"
++exec 9>"$LOCK"; flock -n 9 || { echo "tunnel-sup $NAME already supervising"; exit 0; }
++
++record() { # merge-write only this forward's entry
++  python3 - "$STATE" "$NAME" "$@" <<'PY'
++import json,os,sys,time
++p,name=sys.argv[1],sys.argv[2]
++try: d=json.load(open(p))
++except Exception: d={}
++e=d.get(name,{})
++for kv in sys.argv[3:]:
++    k,v=kv.split("=",1); e[k]=v
++e["ts"]=time.strftime("%Y-%m-%dT%H:%M:%S%z"); e["sup_pid"]=os.getppid()
++d[name]=e; t=p+".tmp"; json.dump(d,open(t,"w"),indent=2); os.replace(t,p)
++PY
+ }
+ 
+-ensure_socks() {
+-  if ! (echo >/dev/tcp/127.0.0.1/2080) 2>/dev/null; then
+-    echo "SOCKS 127.0.0.1:2080 closed — start SFA profile tailscale-socks-2080" >&2
+-    exit 1
+-  fi
++# Real listen check on the Codespace side (do NOT trust a launcher's rc=0).
++remote_listening() {
++  gh cs ssh -c "$CS" -- "ss -ltn 2>/dev/null | grep -qE '127.0.0.1:${RPORT}\\b|\\[::1\\]:${RPORT}\\b|:${RPORT}\\b'" </dev/null >/dev/null 2>&1
+ }
+ 
+-ensure_gh_scope() {
+-  if ! gh auth status -h github.com 2>&1 | grep -q "codespace"; then
+-    echo "gh token missing codespace scope. Approve device login, then:" >&2
+-    echo "  gh auth refresh -h github.com -s codespace" >&2
+-    exit 1
++WAITS=(15 30 60); fails=0
++while true; do
++  if ! (echo >/dev/tcp/127.0.0.1/"$LPORT") 2>/dev/null; then
++    record status=local_closed local_port="$LPORT"; sleep 30; continue
+   fi
+-}
+-
+-install_key_into_codespace() {
+-  # Copy the private key into the Codespace once so it can auth back through the tunnel.
+-  local remote_dir remote_key
+-  remote_dir='~/.ssh'
+-  remote_key='~/.ssh/id_ed25519_codespace_termux'
+-  gh cs ssh -c "$CS_NAME" -- "mkdir -p $remote_dir && chmod 700 $remote_dir" </dev/null
+-  # Use base64 to avoid TTY issues with binary
+-  b64=$(base64 -w0 < "$KEY")
+-  gh cs ssh -c "$CS_NAME" -- "printf '%s' '$b64' | base64 -d > $remote_key && chmod 600 $remote_key && echo KEY_INSTALLED" </dev/null
+-}
+-
+-status() {
+-  echo "user=$USER_NAME"
+-  echo "sshd_port=$LOCAL_PORT"
+-  (echo >/dev/tcp/127.0.0.1/"$LOCAL_PORT") 2>/dev/null && echo "sshd=OPEN" || echo "sshd=CLOSED"
+-  (echo >/dev/tcp/127.0.0.1/2080) 2>/dev/null && echo "socks2080=OPEN" || echo "socks2080=CLOSED"
+-  gh auth status -h github.com 2>&1 | sed -n '1,12p'
+-  pgrep -af "gh cs ssh|$CS_NAME|18022:127" || true
+-  echo "codespace_connect: ssh -p $REMOTE_PORT -i ~/.ssh/id_ed25519_codespace_termux ${USER_NAME}@127.0.0.1"
+-}
+-
+-case "$cmd" in
+-  status)
+-    status
+-    ;;
+-  install-key)
+-    ensure_socks
+-    ensure_gh_scope
+-    install_key_into_codespace
+-    ;;
+-  up|start|tunnel)
+-    ensure_sshd
+-    ensure_socks
+-    ensure_gh_scope
+-    echo "Reverse tunnel: codespace :$REMOTE_PORT -> phone 127.0.0.1:$LOCAL_PORT"
+-    echo "On Codespace after connect:"
+-    echo "  ssh -p $REMOTE_PORT -i ~/.ssh/id_ed25519_codespace_termux ${USER_NAME}@127.0.0.1"
+-    # -N no remote command; keep tunnel up. Remote bind on codespace localhost only.
+-    exec gh cs ssh -c "$CS_NAME" -- \
+-      -o ExitOnForwardFailure=yes \
+-      -o ServerAliveInterval=30 \
+-      -o ServerAliveCountMax=3 \
+-      -N -R "127.0.0.1:${REMOTE_PORT}:127.0.0.1:${LOCAL_PORT}"
+-    ;;
+-  *)
+-    cat <<EOF
+-Usage:
+-  codespace-termux-tunnel status
+-  codespace-termux-tunnel install-key   # copy private key into Codespace once
+-  codespace-termux-tunnel up            # keep reverse tunnel alive
+-
+-Env:
+-  CODESPACE_NAME   (default: orange-guacamole-69wg645vq95p356j)
+-  REVERSE_PORT     (default: 18022)
+-  TERMUX_SSH_PORT  (default: 8022)
+-EOF
+-    exit 2
+-    ;;
+-esac
++  gh cs ssh -c "$CS" -- \
++    -o ExitOnForwardFailure=yes \
++    -o ServerAliveInterval=30 \
++    -o ServerAliveCountMax=3 \
++    -N -R "$SPEC" >>"$LOG" 2>&1 </dev/null &
++  child=$!
++  ok=0
++  for _ in 1 2 3 4 5 6; do sleep 5; kill -0 "$child" 2>/dev/null || break; remote_listening && { ok=1; break; }; done
++  if [ "$ok" = 1 ]; then
++    fails=0; record status=up child_pid="$child" spec="$SPEC" fails=0
++    while kill -0 "$child" 2>/dev/null; do
++      sleep 60
++      remote_listening || { record status=not_listening child_pid="$child"; break; }
++    done
++  fi
++  kill -0 "$child" 2>/dev/null && kill -TERM "$child" 2>/dev/null   # only its OWN child
++  wait "$child" 2>/dev/null
++  fails=$((fails+1))
++  if [ "$fails" -le 3 ]; then w=${WAITS[$((fails-1))]}; else w=300; fi
++  record status=reconnecting fails="$fails" next_wait="$w"
++  sleep "$w"
++done
+--- current/.termux/boot/40-codespace-up.sh	2026-10-19 12:49:51.000000000 -0500
++++ 10-tunnels.draft	2026-10-19 21:42:33.558179103 -0500
+@@ -1,3 +1,10 @@
+ #!/data/data/com.termux/files/usr/bin/bash
+-export PATH=$HOME/bin:$PREFIX/bin:$PATH
+-sleep 20; nohup codespace-ondemand up >$HOME/tmp/codespace-ondemand-up.log 2>&1 &
++# DRAFT (ord-010) — NOT INSTALLED. Termux:Boot script for ~/.termux/boot/10-tunnels.
++# Owner OK required to install, first launch, or kill 19325/19366.
++# Starts each forward supervisor in its OWN session (setsid -f), outside proot and
++# outside any interactive shell, so a serve restart or shell hangup cannot take them down.
++export HOME="${HOME:-/data/data/com.termux/files/home}"
++export PATH="$HOME/bin:/data/data/com.termux/files/usr/bin:$PATH"
++termux-wake-lock
++setsid -f nohup "$HOME/bin/tunnel-sup" r18022 >>"$HOME/tmp/tunnel-sup-boot.log" 2>&1 </dev/null
++setsid -f nohup "$HOME/bin/tunnel-sup" r2223  >>"$HOME/tmp/tunnel-sup-boot.log" 2>&1 </dev/null

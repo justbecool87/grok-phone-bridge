@@ -1,0 +1,101 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# Reverse-tunnel Termux sshd into a GitHub Codespace.
+# Codespace can then: ssh -p 18022 -i ~/.ssh/id_ed25519_codespace_termux u0_a513@127.0.0.1
+# Requires: gh token with codespace scope, SOCKS2080 open, local sshd on 8022.
+set -euo pipefail
+export HOME="${HOME:-/data/data/com.termux/files/home}"
+export PATH="$HOME/bin:/data/data/com.termux/files/usr/bin:$PATH"
+
+CS_NAME="${CODESPACE_NAME:-orange-guacamole-69wg645vq95p356j}"
+REMOTE_PORT="${REVERSE_PORT:-18022}"
+LOCAL_PORT="${TERMUX_SSH_PORT:-8022}"
+KEY="${CODESPACE_TERMUX_KEY:-$HOME/.ssh/id_ed25519_codespace_termux}"
+USER_NAME="$(whoami)"
+
+cmd="${1:-up}"
+
+ensure_sshd() {
+  if ! (echo >/dev/tcp/127.0.0.1/"$LOCAL_PORT") 2>/dev/null; then
+    sshd 2>/dev/null || true
+    sleep 1
+  fi
+  if ! (echo >/dev/tcp/127.0.0.1/"$LOCAL_PORT") 2>/dev/null; then
+    echo "Termux sshd not listening on :$LOCAL_PORT" >&2
+    exit 1
+  fi
+}
+
+ensure_socks() {
+  if ! (echo >/dev/tcp/127.0.0.1/2080) 2>/dev/null; then
+    echo "SOCKS 127.0.0.1:2080 closed — start SFA profile tailscale-socks-2080" >&2
+    exit 1
+  fi
+}
+
+ensure_gh_scope() {
+  if ! gh auth status -h github.com 2>&1 | grep -q "codespace"; then
+    echo "gh token missing codespace scope. Approve device login, then:" >&2
+    echo "  gh auth refresh -h github.com -s codespace" >&2
+    exit 1
+  fi
+}
+
+install_key_into_codespace() {
+  # Copy the private key into the Codespace once so it can auth back through the tunnel.
+  local remote_dir remote_key
+  remote_dir='~/.ssh'
+  remote_key='~/.ssh/id_ed25519_codespace_termux'
+  gh cs ssh -c "$CS_NAME" -- "mkdir -p $remote_dir && chmod 700 $remote_dir" </dev/null
+  # Use base64 to avoid TTY issues with binary
+  b64=$(base64 -w0 < "$KEY")
+  gh cs ssh -c "$CS_NAME" -- "printf '%s' '$b64' | base64 -d > $remote_key && chmod 600 $remote_key && echo KEY_INSTALLED" </dev/null
+}
+
+status() {
+  echo "user=$USER_NAME"
+  echo "sshd_port=$LOCAL_PORT"
+  (echo >/dev/tcp/127.0.0.1/"$LOCAL_PORT") 2>/dev/null && echo "sshd=OPEN" || echo "sshd=CLOSED"
+  (echo >/dev/tcp/127.0.0.1/2080) 2>/dev/null && echo "socks2080=OPEN" || echo "socks2080=CLOSED"
+  gh auth status -h github.com 2>&1 | sed -n '1,12p'
+  pgrep -af "gh cs ssh|$CS_NAME|18022:127" || true
+  echo "codespace_connect: ssh -p $REMOTE_PORT -i ~/.ssh/id_ed25519_codespace_termux ${USER_NAME}@127.0.0.1"
+}
+
+case "$cmd" in
+  status)
+    status
+    ;;
+  install-key)
+    ensure_socks
+    ensure_gh_scope
+    install_key_into_codespace
+    ;;
+  up|start|tunnel)
+    ensure_sshd
+    ensure_socks
+    ensure_gh_scope
+    echo "Reverse tunnel: codespace :$REMOTE_PORT -> phone 127.0.0.1:$LOCAL_PORT"
+    echo "On Codespace after connect:"
+    echo "  ssh -p $REMOTE_PORT -i ~/.ssh/id_ed25519_codespace_termux ${USER_NAME}@127.0.0.1"
+    # -N no remote command; keep tunnel up. Remote bind on codespace localhost only.
+    exec gh cs ssh -c "$CS_NAME" -- \
+      -o ExitOnForwardFailure=yes \
+      -o ServerAliveInterval=30 \
+      -o ServerAliveCountMax=3 \
+      -N -R "127.0.0.1:${REMOTE_PORT}:127.0.0.1:${LOCAL_PORT}"
+    ;;
+  *)
+    cat <<EOF
+Usage:
+  codespace-termux-tunnel status
+  codespace-termux-tunnel install-key   # copy private key into Codespace once
+  codespace-termux-tunnel up            # keep reverse tunnel alive
+
+Env:
+  CODESPACE_NAME   (default: orange-guacamole-69wg645vq95p356j)
+  REVERSE_PORT     (default: 18022)
+  TERMUX_SSH_PORT  (default: 8022)
+EOF
+    exit 2
+    ;;
+esac

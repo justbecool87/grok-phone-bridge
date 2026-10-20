@@ -1,0 +1,177 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# On-demand GitHub Codespace path for the phone lab.
+# Starts the Codespace, refreshes OpenSSH host config, brings reverse tunnels,
+# and optionally keepalives so a 30-minute idle timeout does not drop the VM.
+set -euo pipefail
+if [ "${1:-}" = up ] && [ -z "${CSO_LOCKED:-}" ]; then CSO_LOCK=$HOME/tmp/codespace-ondemand-up.lock; exec 8>"$CSO_LOCK"; flock -n 8 || { echo "codespace-ondemand up already running"; exit 0; }; export CSO_LOCKED=1; fi
+export HOME="${HOME:-/data/data/com.termux/files/home}"
+export PATH="$HOME/bin:/data/data/com.termux/files/usr/bin:$PATH"
+
+CS_NAME="${CODESPACE_NAME:-orange-guacamole-69wg645vq95p356j}"
+SSH_CONF="${HOME}/.ssh/config.d/codespace-orange-guacamole.conf"
+KEEPALIVE_SECS="${CODESPACE_KEEPALIVE_SECS:-600}" # 10 minutes
+PID_DIR="${HOME}/tmp"
+mkdir -p "$PID_DIR" "${HOME}/.ssh/config.d"
+
+cmd="${1:-status}"
+
+need_socks() {
+  if ! (echo >/dev/tcp/127.0.0.1/2080) 2>/dev/null; then
+    echo "SOCKS 127.0.0.1:2080 closed — start SFA profile tailscale-socks-2080" >&2
+    exit 1
+  fi
+}
+
+need_scope() {
+  if ! gh auth status -h github.com 2>&1 | grep -q "codespace"; then
+    echo "gh missing codespace scope" >&2
+    exit 1
+  fi
+}
+
+ensure_sshd() {
+  if ! (echo >/dev/tcp/127.0.0.1/8022) 2>/dev/null; then
+    sshd 2>/dev/null || true
+    sleep 1
+  fi
+}
+
+cs_state() {
+  gh api "/user/codespaces/${CS_NAME}" --jq '.state' 2>/dev/null || echo unknown
+}
+
+pin_ssh_config() {
+  gh cs ssh -c "$CS_NAME" --config >"$SSH_CONF"
+  chmod 600 "$SSH_CONF"
+  echo "pinned $SSH_CONF"
+}
+
+start_cs() {
+  need_scope
+  need_socks
+  local st
+  st=$(cs_state)
+  echo "codespace_state=$st"
+  case "$st" in
+    Available|Running) echo "already up" ;;
+    Shutdown|Stopped|Archived|*)
+      echo "starting $CS_NAME ..."
+      gh cs start -c "$CS_NAME"
+      # wait until Available
+      for _ in $(seq 1 60); do
+        st=$(cs_state)
+        echo "  state=$st"
+        [ "$st" = "Available" ] && break
+        sleep 5
+      done
+      ;;
+  esac
+  pin_ssh_config
+}
+
+start_tunnels() {
+  need_socks
+  need_scope
+  ensure_sshd
+  # Termux sshd reverse (Codespace:18022 -> phone:8022)
+  if ! pgrep -f '18022:127.0.0.1:8022' >/dev/null 2>&1; then
+    nohup "$HOME/bin/codespace-termux-tunnel" up \
+      >"$PID_DIR/codespace-termux-tunnel.log" 2>&1 &
+    echo $! >"$PID_DIR/codespace-termux-tunnel.pid"
+    echo "started termux reverse pid=$(cat "$PID_DIR/codespace-termux-tunnel.pid")"
+  else
+    echo "termux reverse already running"
+  fi
+  # SOCKS reverse (Codespace:2223 -> phone:2080)
+  if ! pgrep -f '2223:127.0.0.1:2080' >/dev/null 2>&1; then
+    bash "$HOME/tmp/start-r2223.sh" >/dev/null
+    echo "started socks reverse"
+  else
+    echo "socks reverse already running"
+  fi
+  # OpenCode reverse (Codespace:14096 -> phone:4096)
+  if ! pgrep -f '14096:127.0.0.1:4096' >/dev/null 2>&1; then
+    bash "$HOME/tmp/start-r14096.sh" >/dev/null 2>&1 && echo "started opencode reverse" || echo "opencode reverse failed (is opencode serve up?)"
+  else
+    echo "opencode reverse already running"
+  fi
+}
+
+keepalive_loop() {
+  need_scope
+  need_socks
+  local pidf="$PID_DIR/codespace-keepalive.pid"
+  if [ -f "$pidf" ] && kill -0 "$(cat "$pidf")" 2>/dev/null; then
+    echo "keepalive already pid=$(cat "$pidf")"
+    return 0
+  fi
+  (
+    while true; do
+      gh cs ssh -c "$CS_NAME" -- "true" </dev/null >/dev/null 2>&1 || true
+      sleep "$KEEPALIVE_SECS"
+    done
+  ) &
+  echo $! >"$pidf"
+  echo "keepalive pid=$(cat "$pidf") every ${KEEPALIVE_SECS}s"
+}
+
+stop_keepalive() {
+  local pidf="$PID_DIR/codespace-keepalive.pid"
+  if [ -f "$pidf" ]; then
+    kill "$(cat "$pidf")" 2>/dev/null || true
+    rm -f "$pidf"
+    echo "keepalive stopped"
+  fi
+}
+
+status() {
+  echo "codespace=$CS_NAME"
+  echo "state=$(cs_state)"
+  gh api "/user/codespaces/${CS_NAME}" --jq '{idle_timeout_minutes,retention_period_minutes,machine:.machine.display_name,web_url}' 2>/dev/null || true
+  (echo >/dev/tcp/127.0.0.1/2080) 2>/dev/null && echo 'socks2080=OPEN' || echo 'socks2080=CLOSED'
+  (echo >/dev/tcp/127.0.0.1/8022) 2>/dev/null && echo 'termux_sshd=OPEN' || echo 'termux_sshd=CLOSED'
+  pgrep -af '18022:127.0.0.1:8022|2223:127.0.0.1:2080|codespace-keepalive|codespace-termux-tunnel' 2>/dev/null || true
+  echo "ssh_host_config=$SSH_CONF"
+  echo "interactive: tmux attach -t cs-orange   OR   gh cs ssh -c $CS_NAME"
+  echo "note: idle_timeout is fixed at create-time (currently 30m). keepalive fights that."
+  echo "to get 240m idle: set GitHub Settings→Codespaces default, then recreate codespace with idle_timeout_minutes=240"
+}
+
+case "$cmd" in
+  status) status ;;
+  start)
+    start_cs
+    start_tunnels
+    status
+    ;;
+  tunnels) start_tunnels ;;
+  pin) pin_ssh_config ;;
+  keepalive) keepalive_loop ;;
+  stop-keepalive) stop_keepalive ;;
+  up)
+    start_cs
+    start_tunnels
+    keepalive_loop
+    status
+    ;;
+  ssh)
+    shift || true
+    exec gh cs ssh -c "$CS_NAME" "$@"
+    ;;
+  *)
+    cat <<EOF
+Usage:
+  codespace-ondemand status
+  codespace-ondemand start          # start VM + pin SSH + tunnels
+  codespace-ondemand up             # start + tunnels + keepalive
+  codespace-ondemand tunnels
+  codespace-ondemand keepalive
+  codespace-ondemand stop-keepalive
+  codespace-ondemand pin
+  codespace-ondemand ssh [-- ...]
+
+Env: CODESPACE_NAME  CODESPACE_KEEPALIVE_SECS (default 600)
+EOF
+    exit 2
+    ;;
+esac

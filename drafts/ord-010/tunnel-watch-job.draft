@@ -1,0 +1,18 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# DRAFT (ord-010) — NOT INSTALLED. Owner OK required to install, schedule, first launch, or kill 19325/19366.
+# tunnel-watch-job: run every 15 min by termux-job-scheduler. Restarts a MISSING tunnel-sup loop
+# (by its flock/pidfile) — never touches a running loop or any ssh/gh child.
+#
+# Scheduler command (text only, do not run without owner OK):
+#   termux-job-scheduler --job-id 4210 --period-ms 900000 --persisted true \
+#     --script "$HOME/bin/tunnel-watch-job"
+export HOME="${HOME:-/data/data/com.termux/files/home}"
+export PATH="$HOME/bin:/data/data/com.termux/files/usr/bin:$PATH"
+for n in r18022 r2223; do
+  lock="$HOME/tmp/tunnel-sup-$n.lock"
+  # flock held => supervisor alive; free => supervisor missing
+  if ( exec 9>"$lock"; flock -n 9 ); then
+    echo "$(date '+%F %T') $n supervisor missing -> setsid -f tunnel-sup $n" >>"$HOME/tmp/tunnel-watch-job.log"
+    setsid -f nohup "$HOME/bin/tunnel-sup" "$n" >>"$HOME/tmp/tunnel-sup-boot.log" 2>&1 </dev/null
+  fi
+done

@@ -1,0 +1,67 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# DRAFT (ord-010) — NOT INSTALLED. Owner OK required to install, first launch, or kill 19325/19366.
+# tunnel-sup <name>: per-forward supervisor. Start detached with:  setsid -f tunnel-sup <name>
+#   names: r18022  (Codespace 127.0.0.1:18022 -> phone 127.0.0.1:8022)
+#          r2223   (Codespace 2223           -> phone 127.0.0.1:2080 SOCKS)
+# Mirrors codespace-termux-tunnel / start-r2223.sh ssh options exactly. Never kills other forwards.
+set -u
+export HOME="${HOME:-/data/data/com.termux/files/home}"
+export PATH="$HOME/bin:/data/data/com.termux/files/usr/bin:$PATH"
+CS="${CODESPACE_NAME:-orange-guacamole-69wg645vq95p356j}"
+NAME="${1:?usage: tunnel-sup r18022|r2223}"
+case "$NAME" in
+  r18022) SPEC="127.0.0.1:18022:127.0.0.1:8022"; RPORT=18022; LPORT=8022 ;;
+  r2223)  SPEC="2223:127.0.0.1:2080";            RPORT=2223;  LPORT=2080 ;;
+  *) echo "unknown forward $NAME" >&2; exit 2 ;;
+esac
+STATE="$HOME/grok-inbox/fleet/state/tunnel-sup.json"
+LOG="$HOME/tmp/tunnel-sup-$NAME.log"
+LOCK="$HOME/tmp/tunnel-sup-$NAME.lock"
+exec 9>"$LOCK"; flock -n 9 || { echo "tunnel-sup $NAME already supervising"; exit 0; }
+
+record() { # merge-write only this forward's entry
+  python3 - "$STATE" "$NAME" "$@" <<'PY'
+import json,os,sys,time
+p,name=sys.argv[1],sys.argv[2]
+try: d=json.load(open(p))
+except Exception: d={}
+e=d.get(name,{})
+for kv in sys.argv[3:]:
+    k,v=kv.split("=",1); e[k]=v
+e["ts"]=time.strftime("%Y-%m-%dT%H:%M:%S%z"); e["sup_pid"]=os.getppid()
+d[name]=e; t=p+".tmp"; json.dump(d,open(t,"w"),indent=2); os.replace(t,p)
+PY
+}
+
+# Real listen check on the Codespace side (do NOT trust a launcher's rc=0).
+remote_listening() {
+  gh cs ssh -c "$CS" -- "ss -ltn 2>/dev/null | grep -qE '127.0.0.1:${RPORT}\\b|\\[::1\\]:${RPORT}\\b|:${RPORT}\\b'" </dev/null >/dev/null 2>&1
+}
+
+WAITS=(15 30 60); fails=0
+while true; do
+  if ! (echo >/dev/tcp/127.0.0.1/"$LPORT") 2>/dev/null; then
+    record status=local_closed local_port="$LPORT"; sleep 30; continue
+  fi
+  gh cs ssh -c "$CS" -- \
+    -o ExitOnForwardFailure=yes \
+    -o ServerAliveInterval=30 \
+    -o ServerAliveCountMax=3 \
+    -N -R "$SPEC" >>"$LOG" 2>&1 </dev/null &
+  child=$!
+  ok=0
+  for _ in 1 2 3 4 5 6; do sleep 5; kill -0 "$child" 2>/dev/null || break; remote_listening && { ok=1; break; }; done
+  if [ "$ok" = 1 ]; then
+    fails=0; record status=up child_pid="$child" spec="$SPEC" fails=0
+    while kill -0 "$child" 2>/dev/null; do
+      sleep 60
+      remote_listening || { record status=not_listening child_pid="$child"; break; }
+    done
+  fi
+  kill -0 "$child" 2>/dev/null && kill -TERM "$child" 2>/dev/null   # only its OWN child
+  wait "$child" 2>/dev/null
+  fails=$((fails+1))
+  if [ "$fails" -le 3 ]; then w=${WAITS[$((fails-1))]}; else w=300; fi
+  record status=reconnecting fails="$fails" next_wait="$w"
+  sleep "$w"
+done

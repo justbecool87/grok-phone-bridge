@@ -1,0 +1,10 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# DRAFT (ord-010) — NOT INSTALLED. Termux:Boot script for ~/.termux/boot/10-tunnels.
+# Owner OK required to install, first launch, or kill 19325/19366.
+# Starts each forward supervisor in its OWN session (setsid -f), outside proot and
+# outside any interactive shell, so a serve restart or shell hangup cannot take them down.
+export HOME="${HOME:-/data/data/com.termux/files/home}"
+export PATH="$HOME/bin:/data/data/com.termux/files/usr/bin:$PATH"
+termux-wake-lock
+setsid -f nohup "$HOME/bin/tunnel-sup" r18022 >>"$HOME/tmp/tunnel-sup-boot.log" 2>&1 </dev/null
+setsid -f nohup "$HOME/bin/tunnel-sup" r2223  >>"$HOME/tmp/tunnel-sup-boot.log" 2>&1 </dev/null
